@@ -1,5 +1,7 @@
+import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import helmet from "helmet";
+import cors from "cors";
 import morgan from "morgan";
 import { z } from "zod";
 import { request } from "undici";
@@ -7,6 +9,7 @@ import { request } from "undici";
 const app = express();
 
 app.use(helmet());
+app.use(cors());
 app.use(morgan("dev"));
 
 const querySchema = z.object({
