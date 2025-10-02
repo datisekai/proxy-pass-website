@@ -71,7 +71,7 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   res.status(status).json({ error: message });
 });
 
-const PORT = Number(process.env.PORT || 3000);
+const PORT = Number(process.env.PORT || 5038);
 app.listen(PORT, () => {
   // eslint-disable-next-line no-console
   console.log(`Server đang chạy tại http://localhost:${PORT}`);
