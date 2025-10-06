@@ -61,6 +61,55 @@ app.get(
   }
 );
 
+// Iframe proxy - bypass X-Frame-Options
+app.get(
+  "/api/iframe",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const parseResult = querySchema.safeParse(req.query);
+      if (!parseResult.success) {
+        return res.status(400).json({
+          error: "Tham số url không hợp lệ",
+          issues: parseResult.error.issues,
+        });
+      }
+
+      const targetUrl = parseResult.data.url;
+
+      // Trả về HTML với iframe nhúng
+      const html = `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iframe Proxy</title>
+    <style>
+        body { margin: 0; padding: 0; }
+        iframe { 
+            width: 100vw; 
+            height: 100vh; 
+            border: none; 
+            display: block; 
+        }
+    </style>
+</head>
+<body>
+    <iframe src="${targetUrl}" allowfullscreen sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"></iframe>
+</body>
+</html>`;
+
+      res.status(200);
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("X-Frame-Options", "ALLOWALL");
+      res.setHeader("Content-Security-Policy", "frame-ancestors *");
+      return res.send(html);
+    } catch (err) {
+      return next(err);
+    }
+  }
+);
+
 // Health check đơn giản
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
