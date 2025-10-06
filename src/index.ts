@@ -61,7 +61,7 @@ app.get(
   }
 );
 
-// Iframe proxy - bypass X-Frame-Options
+// Iframe content proxy - thực sự proxy nội dung để bypass iframe restrictions
 app.get(
   "/api/iframe",
   async (req: Request, res: Response, next: NextFunction) => {
@@ -76,34 +76,56 @@ app.get(
 
       const targetUrl = parseResult.data.url;
 
-      // Trả về HTML với iframe nhúng
-      const html = `
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iframe Proxy</title>
-    <style>
-        body { margin: 0; padding: 0; }
-        iframe { 
-            width: 100vw; 
-            height: 100vh; 
-            border: none; 
-            display: block; 
-        }
-    </style>
-</head>
-<body>
-    <iframe src="${targetUrl}" allowfullscreen sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"></iframe>
-</body>
-</html>`;
+      const { body, headers, statusCode } = await request(targetUrl, {
+        method: "GET",
+        headers: {
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "User-Agent":
+            "Mozilla/5.0 (compatible; SimpleProxy/1.0; +https://example.local)",
+          Referer: targetUrl,
+        },
+      });
 
-      res.status(200);
+      const chunks: Buffer[] = [];
+      for await (const chunk of body as any) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      const content = Buffer.concat(chunks).toString("utf-8");
+
+      // Thay thế các URL tương đối thành tuyệt đối và proxy qua server này
+      const modifiedContent = content
+        .replace(
+          /src="\/([^"]*)"/g,
+          `src="/api/proxy?url=${encodeURIComponent(
+            new URL(targetUrl).origin
+          )}/$1"`
+        )
+        .replace(
+          /href="\/([^"]*)"/g,
+          `href="/api/proxy?url=${encodeURIComponent(
+            new URL(targetUrl).origin
+          )}/$1"`
+        )
+        .replace(
+          /action="\/([^"]*)"/g,
+          `action="/api/proxy?url=${encodeURIComponent(
+            new URL(targetUrl).origin
+          )}/$1"`
+        )
+        .replace(
+          /url\(\/([^)]*)\)/g,
+          `url(/api/proxy?url=${encodeURIComponent(
+            new URL(targetUrl).origin
+          )}/$1)`
+        );
+
+      res.status(statusCode);
       res.setHeader("Content-Type", "text/html; charset=utf-8");
       res.setHeader("X-Frame-Options", "ALLOWALL");
       res.setHeader("Content-Security-Policy", "frame-ancestors *");
-      return res.send(html);
+      res.setHeader("Referrer-Policy", "no-referrer");
+      return res.send(modifiedContent);
     } catch (err) {
       return next(err);
     }
